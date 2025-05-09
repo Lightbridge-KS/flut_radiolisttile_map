@@ -1,5 +1,75 @@
 import 'package:flutter/material.dart';
 
+/// A controller for managing the state of a RadioListTileMcq widget.
+///
+/// The `RadioListTileController` provides a way to control a RadioListTileMcq widget
+/// externally. It manages the currently selected value and notifies listeners when
+/// the selection changes.
+///
+/// Use cases:
+/// - Access or modify the selected value from outside the RadioListTileMcq
+/// - Programmatically change the selection
+/// - React to selection changes in parent widgets
+/// - Coordinate multiple radio groups
+/// - Reset the selection to null/empty
+///
+/// Example usage:
+/// ```dart
+/// // Create a controller with an initial value
+/// final controller = RadioListTileController(initialValue: 'option1');
+///
+/// // Listen to changes
+/// controller.addListener(() {
+///   print('Selection changed to: ${controller.selectedValue}');
+/// });
+///
+/// // Use with RadioListTileMcq widget
+/// RadioListTileMcq(
+///   options: {'option1': 'First Option', 'option2': 'Second Option'},
+///   controller: controller,
+/// );
+///
+/// // Programmatically change the selection
+/// controller.selectedValue = 'option2';
+///
+/// // Clear the selection
+/// controller.clear();
+///
+/// // Don't forget to dispose when done
+/// @override
+/// void dispose() {
+///   controller.dispose();
+///   super.dispose();
+/// }
+/// ```
+class RadioListTileController extends ChangeNotifier {
+  String? _selectedValue;
+
+  /// Current selected value
+  String? get selectedValue => _selectedValue;
+  
+  /// Set the selected value and notify listeners
+  set selectedValue(String? value) {
+    if (_selectedValue != value) {
+      _selectedValue = value;
+      notifyListeners();
+    }
+  }
+  
+  /// Constructor with optional initial value
+  RadioListTileController({String? initialValue}) : _selectedValue = initialValue;
+  
+  /// Reset selection to null
+  void clear() {
+    selectedValue = null;
+  }
+  
+  @override
+  void dispose() {
+    super.dispose();
+  }
+}
+
 /// A reusable widget that displays a list of radio options generated from a map.
 ///
 /// `RadioListTileMcq` creates a vertical list of [RadioListTile] widgets from a
@@ -39,6 +109,12 @@ class RadioListTileMcq extends StatefulWidget {
   
   /// Callback when selection changes (optional)
   final Function(String? value)? onSelectionChanged;
+  
+  /// Controller for external state management (optional)
+  final RadioListTileController? controller;
+  
+  /// Whether to show the selection display at bottom
+  final bool showSelectionDisplay;
 
   const RadioListTileMcq({
     super.key, 
@@ -46,22 +122,55 @@ class RadioListTileMcq extends StatefulWidget {
     this.initialValue,
     this.title,
     this.onSelectionChanged,
-  });
+    this.controller,
+    this.showSelectionDisplay = true,
+  }) : assert(initialValue == null || controller == null, 
+             "Cannot provide both initialValue and controller");
 
   @override
   State<RadioListTileMcq> createState() => _RadioListTileMcqState();
 }
 
 class _RadioListTileMcqState extends State<RadioListTileMcq> {
-  // This stores the currently selected key
-  String? _selectedValue;
+  // Internal controller used when external controller is not provided
+  RadioListTileController? _internalController;
   
+  // The controller we'll actually use
+  RadioListTileController get _effectiveController => 
+      widget.controller ?? _internalController!;
+      
   @override
   void initState() {
     super.initState();
-    // Use the initial value provided, or the first item if available
-    _selectedValue = widget.initialValue ?? 
-                     (widget.options.isNotEmpty ? widget.options.keys.first : null);
+    if (widget.controller == null) {
+      // Create internal controller if external one is not provided
+      _internalController = RadioListTileController(
+        initialValue: widget.initialValue ?? 
+                      (widget.options.isNotEmpty ? widget.options.keys.first : null)
+      );
+    }
+    
+    // Add listener to the controller
+    _effectiveController.addListener(_onControllerChanged);
+  }
+  
+  void _onControllerChanged() {
+    // This will be called when the controller's value changes
+    if (mounted) setState(() {});
+    
+    // Call the callback if provided
+    if (widget.onSelectionChanged != null) {
+      widget.onSelectionChanged!(_effectiveController.selectedValue);
+    }
+  }
+  
+  @override
+  void dispose() {
+    // Remove listener from controller
+    _effectiveController.removeListener(_onControllerChanged);
+    // Dispose internal controller if we created it
+    _internalController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -84,28 +193,23 @@ class _RadioListTileMcqState extends State<RadioListTileMcq> {
             return RadioListTile<String>(
               title: Text(entry.value),
               value: entry.key,
-              groupValue: _selectedValue,
+              groupValue: _effectiveController.selectedValue,
               onChanged: (String? value) {
-                setState(() {
-                  _selectedValue = value;
-                });
-                // Call the callback if provided
-                if (widget.onSelectionChanged != null) {
-                  widget.onSelectionChanged!(value);
-                }
+                _effectiveController.selectedValue = value;
                 print('Selected: $value (${widget.options[value]})');
               },
             );
           }),
           
-          // Add a display of the currently selected value
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Selected: ${_selectedValue ?? 'None'}',
-              style: Theme.of(context).textTheme.titleMedium,
+          // Add a display of the currently selected value (optional)
+          if (widget.showSelectionDisplay)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Selected: ${_effectiveController.selectedValue ?? 'None'}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
-          ),
         ],
       ),
     );
