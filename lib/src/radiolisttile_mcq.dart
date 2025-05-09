@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 /// A controller for managing the state of a RadioListTileMcq widget.
 ///
@@ -47,7 +48,7 @@ class RadioListTileController extends ChangeNotifier {
 
   /// Current selected value
   String? get selectedValue => _selectedValue;
-  
+
   /// Set the selected value and notify listeners
   set selectedValue(String? value) {
     if (_selectedValue != value) {
@@ -55,18 +56,14 @@ class RadioListTileController extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   /// Constructor with optional initial value
-  RadioListTileController({String? initialValue}) : _selectedValue = initialValue;
-  
+  RadioListTileController({String? initialValue})
+    : _selectedValue = initialValue;
+
   /// Reset selection to null
   void clear() {
     selectedValue = null;
-  }
-  
-  @override
-  void dispose() {
-    super.dispose();
   }
 }
 
@@ -100,32 +97,34 @@ class RadioListTileController extends ChangeNotifier {
 class RadioListTileMcq extends StatefulWidget {
   /// Map of options to display as radio tiles
   final Map<String, String> options;
-  
+
   /// Initial selected value (optional)
   final String? initialValue;
-  
+
   /// Title for the radio group (optional)
   final String? title;
-  
+
   /// Callback when selection changes (optional)
   final Function(String? value)? onSelectionChanged;
-  
+
   /// Controller for external state management (optional)
   final RadioListTileController? controller;
-  
+
   /// Whether to show the selection display at bottom
   final bool showSelectionDisplay;
 
   const RadioListTileMcq({
-    super.key, 
+    super.key,
     required this.options,
     this.initialValue,
     this.title,
     this.onSelectionChanged,
     this.controller,
     this.showSelectionDisplay = true,
-  }) : assert(initialValue == null || controller == null, 
-             "Cannot provide both initialValue and controller");
+  }) : assert(
+         initialValue == null || controller == null,
+         "Cannot provide both initialValue and controller",
+       );
 
   @override
   State<RadioListTileMcq> createState() => _RadioListTileMcqState();
@@ -134,36 +133,37 @@ class RadioListTileMcq extends StatefulWidget {
 class _RadioListTileMcqState extends State<RadioListTileMcq> {
   // Internal controller used when external controller is not provided
   RadioListTileController? _internalController;
-  
+
   // The controller we'll actually use
-  RadioListTileController get _effectiveController => 
+  RadioListTileController get _effectiveController =>
       widget.controller ?? _internalController!;
-      
+
   @override
   void initState() {
     super.initState();
     if (widget.controller == null) {
       // Create internal controller if external one is not provided
       _internalController = RadioListTileController(
-        initialValue: widget.initialValue ?? 
-                      (widget.options.isNotEmpty ? widget.options.keys.first : null)
+        initialValue:
+            widget.initialValue ??
+            (widget.options.isNotEmpty ? widget.options.keys.first : null),
       );
     }
-    
+
     // Add listener to the controller
     _effectiveController.addListener(_onControllerChanged);
   }
-  
+
   void _onControllerChanged() {
     // This will be called when the controller's value changes
     if (mounted) setState(() {});
-    
+
     // Call the callback if provided
     if (widget.onSelectionChanged != null) {
       widget.onSelectionChanged!(_effectiveController.selectedValue);
     }
   }
-  
+
   @override
   void dispose() {
     // Remove listener from controller
@@ -187,7 +187,7 @@ class _RadioListTileMcqState extends State<RadioListTileMcq> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
-          
+
           // Dynamically generate RadioListTile widgets from the Map
           ...widget.options.entries.map((entry) {
             return RadioListTile<String>(
@@ -196,12 +196,15 @@ class _RadioListTileMcqState extends State<RadioListTileMcq> {
               groupValue: _effectiveController.selectedValue,
               onChanged: (String? value) {
                 _effectiveController.selectedValue = value;
-                print('Selected: $value (${widget.options[value]})');
+
+                if (kDebugMode) {
+                  debugPrint('Selected: $value (${widget.options[value]})');
+                }
               },
             );
           }),
-          
-          // Add a display of the currently selected value (optional)
+
+          // Add a display of the currently selected value (Remove this in production)
           if (widget.showSelectionDisplay)
             Padding(
               padding: const EdgeInsets.all(16.0),
